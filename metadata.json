@@ -1,0 +1,5 @@
+{
+  "name": "Remix: Hybrid Healthcare Fraud Intelligence Platform",
+  "description": "A hackathon prototype for detecting healthcare insurance fraud using machine learning, graph analytics, and explainable AI.",
+  "requestFramePermissions": []
+}
