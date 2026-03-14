@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import serverless from 'serverless-http';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { GoogleGenAI, Type } from '@google/genai';
@@ -77,7 +78,7 @@ const mockHeatmapData = [
 ];
 
 // Mock alerts data
-let mockAlerts = [
+let mockAlerts: any[] = [
   {
     alert_id: "ALT-001",
     claim_id: "CLM-12345",
@@ -178,10 +179,7 @@ function calculateMockFraudScore(extractedData: any) {
   };
 }
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
-
+function setupApiRoutes(app: express.Express) {
   app.use(express.json({ limit: '50mb' }));
 
   // API Routes
@@ -231,7 +229,7 @@ async function startServer() {
       const extractedData = aiResult.extractedData || {};
 
       // 2. ML Models (Isolation Forest / Autoencoder simulation)
-      const mlResult = calculateMLFraudScore(extractedData);
+      const mlResult = await calculateMLFraudScore(extractedData);
 
       // 3. Combine Scores
       const finalScore = Math.min(100, Math.max(0, (aiResult.aiFraudScore * 0.6) + (mlResult.score * 0.4)));
@@ -392,7 +390,9 @@ async function startServer() {
           risk_level: "High",
           timestamp: new Date().toISOString(),
           suspicious_indicators: ["Automated detection"],
-          status: "active"
+          status: "active",
+          escalation_level: "Medium",
+          notes: ""
         };
         mockAlerts.unshift(newAlert);
         if (mockAlerts.length > 20) mockAlerts = mockAlerts.slice(0, 20);
@@ -465,30 +465,47 @@ async function startServer() {
     }
   });
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
+  // Health endpoint
+  app.get('/api/health', (req, res) => {
+    res.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      version: '2.0',
+      services: {
+        ml_model: 'not_loaded',
+        database: 'connected'
+      }
     });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
+  });
 
   // Global error handler
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error('Express Error:', err);
     res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
   });
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
 }
 
-startServer();
+const isVercel = !!process.env.VERCEL;
+const app = express();
+setupApiRoutes(app);
+
+if (!isVercel) {
+  // Local development: start Vite dev server + Express for APIs
+  createViteServer({
+    server: { middlewareMode: true },
+    appType: 'spa',
+  })
+    .then((vite) => {
+      app.use(vite.middlewares);
+
+      const PORT = 3000;
+      app.listen(PORT, '0.0.0.0', () => {
+        console.log(`Server running on http://localhost:${PORT}`);
+      });
+    })
+    .catch((err) => {
+      console.error('Failed to start Vite dev server:', err);
+    });
+}
+
+export default serverless(app);

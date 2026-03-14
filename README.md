@@ -28,4 +28,11 @@ For production deployment, see [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instr
 ./deploy.sh
 ```
 
-This will guide you through deploying to Vercel (frontend) and Railway (backend).
+This will guide you through deploying to Vercel (frontend) and Render (backend).
+
+### Single Live URL (Frontend + API)
+When deployed to Vercel, your app is available from a single URL (e.g. `https://your-app.vercel.app`). All API calls are served under `/api/*` on the same domain, and the Vercel serverless functions proxy those requests to the Python backend (Railway).
+
+✅ **What you need to set in Vercel:**
+- `PYTHON_BACKEND_URL`: Your Railway backend URL (e.g. `https://your-railway-app.railway.app`)
+- `GEMINI_API_KEY`: Your Gemini API key

@@ -105,7 +105,7 @@ export default function FraudRiskHeatmap() {
               multiple
               className="w-full border border-slate-300 rounded-lg px-3 py-2"
               onChange={(e) => {
-                const values = Array.from(e.target.selectedOptions, option => option.value);
+                const values = Array.from(e.target.selectedOptions, option => (option as HTMLOptionElement).value);
                 setFilters(prev => ({ ...prev, risk_level: values }));
               }}
             >
@@ -121,7 +121,7 @@ export default function FraudRiskHeatmap() {
               multiple
               className="w-full border border-slate-300 rounded-lg px-3 py-2"
               onChange={(e) => {
-                const values = Array.from(e.target.selectedOptions, option => option.value);
+                const values = Array.from(e.target.selectedOptions, option => (option as HTMLOptionElement).value);
                 setFilters(prev => ({ ...prev, claim_type: values }));
               }}
             >
