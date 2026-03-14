@@ -5,6 +5,10 @@ import ClaimDetector from './pages/ClaimDetector';
 import NetworkGraph from './pages/NetworkGraph';
 import HospitalRanking from './pages/HospitalRanking';
 import Architecture from './pages/Architecture';
+import FraudRiskHeatmap from './pages/FraudRiskHeatmap';
+import AIClaimExplanation from './pages/AIClaimExplanation';
+import RealTimeFraudAlerts from './pages/RealTimeFraudAlerts';
+import FraudRiskSimulator from './pages/FraudRiskSimulator';
 import { cn } from './lib/utils';
 
 // Declare window.aistudio for TypeScript
@@ -70,8 +74,10 @@ export default function App() {
   const navItems = [
     { id: 'detector', label: 'Real-Time Claim Submission', icon: <ShieldAlert className="w-5 h-5" /> },
     { id: 'dashboard', label: 'Fraud Analytics', icon: <Activity className="w-5 h-5" /> },
-    { id: 'network', label: 'Fraud Network Graph', icon: <Network className="w-5 h-5" /> },
-    { id: 'ranking', label: 'Hospital Risk Ranking', icon: <Building2 className="w-5 h-5" /> },
+    { id: 'heatmap', label: 'Fraud Risk Heatmap', icon: <Network className="w-5 h-5" /> },
+    { id: 'explanation', label: 'AI Claim Explanation', icon: <FileCode2 className="w-5 h-5" /> },
+    { id: 'alerts', label: 'Real-Time Alerts', icon: <Server className="w-5 h-5" /> },
+    { id: 'simulator', label: 'Fraud Risk Simulator', icon: <Building2 className="w-5 h-5" /> },
     { id: 'architecture', label: 'System Architecture', icon: <Server className="w-5 h-5" /> },
   ];
 
@@ -147,8 +153,10 @@ export default function App() {
           <div className="max-w-7xl mx-auto">
             {activeTab === 'dashboard' && <Dashboard />}
             {activeTab === 'detector' && <ClaimDetector />}
-            {activeTab === 'network' && <NetworkGraph />}
-            {activeTab === 'ranking' && <HospitalRanking />}
+            {activeTab === 'heatmap' && <FraudRiskHeatmap />}
+            {activeTab === 'explanation' && <AIClaimExplanation />}
+            {activeTab === 'alerts' && <RealTimeFraudAlerts />}
+            {activeTab === 'simulator' && <FraudRiskSimulator />}
             {activeTab === 'architecture' && <Architecture />}
           </div>
         </div>

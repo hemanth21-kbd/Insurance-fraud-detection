@@ -10,11 +10,22 @@ View your app in AI Studio: https://ai.studio/apps/5b9be166-ca15-4aea-b1ca-3e55d
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js, Python 3.11+
 
 1. Install dependencies:
    `npm install`
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## 🚀 Deploy to Production
+
+For production deployment, see [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
+
+**Quick Deploy:**
+```bash
+# Run the deployment script
+./deploy.sh
+```
+
+This will guide you through deploying to Vercel (frontend) and Railway (backend).

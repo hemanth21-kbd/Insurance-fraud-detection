@@ -33,8 +33,125 @@ class FraudGraph {
 const fraudGraph = new FraudGraph();
 const recentClaims: any[] = [];
 
+// Mock heatmap data
+const mockHeatmapData = [
+  {
+    hospital_name: "City General Hospital",
+    location: [-74.006, 40.7128],
+    address: "123 Main St, New York, NY",
+    avg_fraud_probability: 0.85,
+    risk_level: "High Risk",
+    risk_color: "#ef4444",
+    claim_count: 1250,
+    avg_claim_amount: 8500,
+    total_claim_amount: 10625000,
+    hospital_rating: 3.2,
+    coordinates: { lat: 40.7128, lng: -74.006 }
+  },
+  {
+    hospital_name: "Metro Medical Center",
+    location: [-87.6298, 41.8781],
+    address: "456 Health Ave, Chicago, IL",
+    avg_fraud_probability: 0.65,
+    risk_level: "Medium Risk",
+    risk_color: "#f59e0b",
+    claim_count: 980,
+    avg_claim_amount: 6200,
+    total_claim_amount: 6087600,
+    hospital_rating: 4.1,
+    coordinates: { lat: 41.8781, lng: -87.6298 }
+  },
+  {
+    hospital_name: "Valley Health System",
+    location: [-118.2437, 34.0522],
+    address: "789 Care Blvd, Los Angeles, CA",
+    avg_fraud_probability: 0.25,
+    risk_level: "Low Risk",
+    risk_color: "#10b981",
+    claim_count: 750,
+    avg_claim_amount: 4200,
+    total_claim_amount: 3150000,
+    hospital_rating: 4.8,
+    coordinates: { lat: 34.0522, lng: -118.2437 }
+  }
+];
+
+// Mock alerts data
+let mockAlerts = [
+  {
+    alert_id: "ALT-001",
+    claim_id: "CLM-12345",
+    hospital_name: "City General Hospital",
+    fraud_score: 0.92,
+    risk_level: "Critical",
+    timestamp: new Date().toISOString(),
+    suspicious_indicators: ["Unusual claim frequency", "High-value procedures"],
+    status: "active",
+    escalation_level: "High"
+  },
+  {
+    alert_id: "ALT-002",
+    claim_id: "CLM-12346",
+    hospital_name: "Metro Medical Center",
+    fraud_score: 0.78,
+    risk_level: "High",
+    timestamp: new Date(Date.now() - 3600000).toISOString(),
+    suspicious_indicators: ["Duplicate billing codes"],
+    status: "active",
+    escalation_level: "Medium"
+  }
+];
+
+let monitoringActive = false;
+
 // Mock Isolation Forest / Autoencoder scoring
-function calculateMLFraudScore(extractedData: any) {
+async function calculateMLFraudScore(extractedData: any) {
+  try {
+    // Map extracted data to ML model features
+    const claimData = {
+      treatment_cost: extractedData.totalAmount * 0.8 || 0, // Estimate treatment cost as 80% of total
+      claim_amount: extractedData.totalAmount || 0,
+      admission_days: extractedData.admissionDays || 0,
+      test_count: extractedData.testCount || 0,
+      age: extractedData.patientAge || 45,
+      hospital_rating: extractedData.hospitalRating || 3.0,
+      previous_claims: extractedData.previousClaims || 0,
+      diagnosis_complexity: extractedData.diagnosisCount || 5.0,
+      medicines: extractedData.medicines || [],
+      procedure_codes: extractedData.procedures || []
+    };
+
+    // Call the trained Python model for real ML scoring
+    const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'http://localhost:8000';
+    const response = await fetch(`${pythonBackendUrl}/api/ml/score`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        claim_data: claimData
+      })
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      return {
+        score: result.fraud_score,
+        reasons: result.reasons || ['ML model prediction']
+      };
+    } else {
+      console.error('Python ML API failed, falling back to mock scoring');
+      // Fallback to mock scoring
+      return calculateMockFraudScore(extractedData);
+    }
+  } catch (error) {
+    console.error('Error calling Python ML API:', error);
+    // Fallback to mock scoring
+    return calculateMockFraudScore(extractedData);
+  }
+}
+
+function calculateMockFraudScore(extractedData: any) {
   let score = 0;
   const reasons = [];
 
@@ -186,6 +303,164 @@ async function startServer() {
       res.json(recentClaims.slice(0, 10)); // Return top 10 recent claims
     } catch (error: any) {
       console.error('API Error:', error);
+      res.status(500).json({ error: error.message || 'Internal Server Error' });
+    }
+  });
+
+  // Heatmap endpoint
+  app.get('/api/heatmap', (req, res) => {
+    try {
+      const { hospital, claim_type, risk_level, date_from, date_to } = req.query;
+      
+      let filteredData = [...mockHeatmapData];
+      
+      if (hospital) {
+        const hospitals = Array.isArray(hospital) ? hospital : [hospital];
+        filteredData = filteredData.filter(h => hospitals.includes(h.hospital_name));
+      }
+      
+      if (risk_level) {
+        const levels = Array.isArray(risk_level) ? risk_level : [risk_level];
+        filteredData = filteredData.filter(h => levels.includes(h.risk_level));
+      }
+      
+      // Mock filtering by date (not implemented in detail)
+      if (date_from && date_to) {
+        // In a real implementation, filter by date range
+      }
+      
+      res.json({
+        heatmap_data: filteredData,
+        total_hospitals: filteredData.length,
+        high_risk_hospitals: filteredData.filter(h => h.risk_level === 'High Risk').length,
+        summary: {
+          avg_fraud_probability: filteredData.reduce((sum, h) => sum + h.avg_fraud_probability, 0) / filteredData.length,
+          total_claims: filteredData.reduce((sum, h) => sum + h.claim_count, 0),
+          total_amount: filteredData.reduce((sum, h) => sum + h.total_claim_amount, 0)
+        }
+      });
+    } catch (error: any) {
+      console.error('API Error:', error);
+      res.status(500).json({ error: error.message || 'Internal Server Error' });
+    }
+  });
+
+  // Alerts endpoints
+  app.get('/api/alerts', (req, res) => {
+    try {
+      const { threshold = 0.5, limit = 50, status } = req.query;
+      let filteredAlerts = mockAlerts.filter(alert => alert.fraud_score >= parseFloat(threshold as string));
+      
+      if (status) {
+        filteredAlerts = filteredAlerts.filter(alert => alert.status === status);
+      }
+      
+      filteredAlerts = filteredAlerts.slice(0, parseInt(limit as string));
+      
+      res.json({
+        alerts: filteredAlerts,
+        total: filteredAlerts.length,
+        active: filteredAlerts.filter(a => a.status === 'active').length
+      });
+    } catch (error: any) {
+      console.error('API Error:', error);
+      res.status(500).json({ error: error.message || 'Internal Server Error' });
+    }
+  });
+
+  app.get('/api/alerts/monitoring/status', (req, res) => {
+    try {
+      res.json({ monitoring_active: monitoringActive });
+    } catch (error: any) {
+      console.error('API Error:', error);
+      res.status(500).json({ error: error.message || 'Internal Server Error' });
+    }
+  });
+
+  app.post('/api/alerts/monitoring/start', (req, res) => {
+    try {
+      const { threshold = 0.75 } = req.body;
+      monitoringActive = true;
+      // Simulate starting monitoring
+      setTimeout(() => {
+        // Add a new mock alert periodically
+        const newAlert = {
+          alert_id: `ALT-${Date.now()}`,
+          claim_id: `CLM-${Math.floor(Math.random() * 10000)}`,
+          hospital_name: mockHeatmapData[Math.floor(Math.random() * mockHeatmapData.length)].hospital_name,
+          fraud_score: Math.random() * 0.5 + 0.5,
+          risk_level: "High",
+          timestamp: new Date().toISOString(),
+          suspicious_indicators: ["Automated detection"],
+          status: "active"
+        };
+        mockAlerts.unshift(newAlert);
+        if (mockAlerts.length > 20) mockAlerts = mockAlerts.slice(0, 20);
+      }, 10000); // Add alert after 10 seconds
+      
+      res.json({ status: 'started', threshold });
+    } catch (error: any) {
+      console.error('API Error:', error);
+      res.status(500).json({ error: error.message || 'Internal Server Error' });
+    }
+  });
+
+  app.post('/api/alerts/monitoring/stop', (req, res) => {
+    try {
+      monitoringActive = false;
+      res.json({ status: 'stopped' });
+    } catch (error: any) {
+      console.error('API Error:', error);
+      res.status(500).json({ error: error.message || 'Internal Server Error' });
+    }
+  });
+
+  app.put('/api/alerts/:alertId', (req, res) => {
+    try {
+      const { alertId } = req.params;
+      const { status, notes } = req.body;
+      
+      const alertIndex = mockAlerts.findIndex(a => a.alert_id === alertId);
+      if (alertIndex !== -1) {
+        mockAlerts[alertIndex].status = status;
+        mockAlerts[alertIndex].notes = notes;
+        res.json({ status: 'updated' });
+      } else {
+        res.status(404).json({ error: 'Alert not found' });
+      }
+    } catch (error: any) {
+      console.error('API Error:', error);
+      res.status(500).json({ error: error.message || 'Internal Server Error' });
+    }
+  });
+
+  // Simulator proxy endpoints
+  app.post('/api/simulator/predict', async (req, res) => {
+    try {
+      const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'http://localhost:8000';
+      const response = await fetch(`${pythonBackendUrl}/api/simulator/predict`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(req.body)
+      });
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error('Simulator API Error:', error);
+      res.status(500).json({ error: error.message || 'Internal Server Error' });
+    }
+  });
+
+  app.get('/api/simulator/scenarios', async (req, res) => {
+    try {
+      const pythonBackendUrl = process.env.PYTHON_BACKEND_URL || 'http://localhost:8000';
+      const response = await fetch(`${pythonBackendUrl}/api/simulator/scenarios`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error('Simulator scenarios API Error:', error);
       res.status(500).json({ error: error.message || 'Internal Server Error' });
     }
   });
