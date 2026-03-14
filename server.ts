@@ -5,6 +5,42 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { GoogleGenAI, Type } from '@google/genai';
 
+// If you want to use Hugging Face instead of Gemini for OCR / text inference,
+// set these env vars in Render/Vercel:
+//   HUGGINGFACE_API_KEY
+//   HUGGINGFACE_MODEL (optional, default: 'microsoft/trocr-base-printed')
+const HF_API_KEY = process.env.HUGGINGFACE_API_KEY;
+const HF_MODEL = process.env.HUGGINGFACE_MODEL || 'microsoft/trocr-base-printed';
+
+async function runHuggingFaceOCR(base64Data: string): Promise<string> {
+  if (!HF_API_KEY) throw new Error('Hugging Face API key is not configured');
+
+  const response = await fetch(`https://api-inference.huggingface.co/models/${HF_MODEL}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${HF_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ inputs: base64Data, options: { wait_for_model: true } }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Hugging Face inference error: ${response.status} ${errorText}`);
+  }
+
+  const data = await response.json();
+  if (typeof data === 'string') return data;
+  if (Array.isArray(data) && data.length > 0 && typeof data[0].generated_text === 'string') {
+    return data[0].generated_text;
+  }
+
+  // Some models return raw text directly
+  if (typeof data.text === 'string') return data.text;
+
+  return JSON.stringify(data);
+}
+
 // Simple Graph implementation to simulate NetworkX
 class FraudGraph {
   nodes: Map<string, any> = new Map();
@@ -198,9 +234,38 @@ function setupApiRoutes(app: express.Express) {
         return res.status(500).json({ error: 'API Key is not configured on the server or provided in the request.' });
       }
 
-      const ai = new GoogleGenAI({ apiKey });
+      const useHF = !!HF_API_KEY;
+      let extractedData: any = {};
+      let aiFraudScore = 50;
+      let aiReasons: string[] = [];
 
-      const prompt = `
+      if (useHF) {
+        // Use Hugging Face Inference to OCR the image
+        const ocrText = await runHuggingFaceOCR(imageBase64);
+
+        // Basic heuristic extraction from OCR output
+        const amountMatch = ocrText.match(/\$?\s*([0-9]+(?:\.[0-9]{2})?)/);
+        const amount = amountMatch ? parseFloat(amountMatch[1]) : 0;
+        const patientIdMatch = ocrText.match(/Patient\s*ID[:\s]*([A-Za-z0-9-]+)/i);
+        const patientId = patientIdMatch ? patientIdMatch[1] : "unknown";
+
+        extractedData = {
+          hospitalName: "Unknown Hospital",
+          patientId,
+          diagnosis: ocrText.slice(0, 150),
+          totalAmount: amount,
+          medicines: []
+        };
+
+        aiFraudScore = amount > 5000 ? 75 : 30;
+        aiReasons = [
+          "OCR via Hugging Face Inference",
+          `Detected total amount: $${amount.toFixed(2)}`
+        ];
+      } else {
+        const ai = new GoogleGenAI({ apiKey });
+
+        const prompt = `
       You are an advanced Fraud Intelligence AI. Analyze this medical bill image.
       1. Perform OCR to extract: hospitalName, patientId, diagnosis, procedureCodes, medicines, quantities, dates, and totalAmount.
       2. Perform automated cross-verification: Check for inflated billing, duplicate procedures, unnecessary treatments, abnormal medicine quantities, or mismatches between diagnosis and procedures.
@@ -209,36 +274,39 @@ function setupApiRoutes(app: express.Express) {
       5. Provide explainable AI reasons for your score.
       `;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: {
-          parts: [
-            { inlineData: { data: imageBase64, mimeType } },
-            { text: prompt + '\n\nIMPORTANT: You must return the response as a valid JSON object with the following structure: { "extractedData": { "hospitalName": "string", "patientId": "string", "diagnosis": "string", "totalAmount": number, "medicines": ["string"] }, "aiFraudScore": number, "riskLevel": "string", "explainableReasons": ["string"] }' }
-          ]
-        },
-        config: {
-          responseMimeType: "application/json",
-        }
-      });
+        const response = await ai.models.generateContent({
+          model: 'gemini-3-flash-preview',
+          contents: {
+            parts: [
+              { inlineData: { data: imageBase64, mimeType } },
+              { text: prompt + '\n\nIMPORTANT: You must return the response as a valid JSON object with the following structure: { "extractedData": { "hospitalName": "string", "patientId": "string", "diagnosis": "string", "totalAmount": number, "medicines": ["string"] }, "aiFraudScore": number, "riskLevel": "string", "explainableReasons": ["string"] }' }
+            ]
+          },
+          config: {
+            responseMimeType: "application/json",
+          }
+        });
 
-      let responseText = response.text || "{}";
-      // Clean up potential markdown formatting from the response
-      responseText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      const aiResult = JSON.parse(responseText);
-      const extractedData = aiResult.extractedData || {};
+        let responseText = response.text || "{}";
+        // Clean up potential markdown formatting from the response
+        responseText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        const aiResult = JSON.parse(responseText);
+        extractedData = aiResult.extractedData || {};
+        aiFraudScore = aiResult.aiFraudScore;
+        aiReasons = aiResult.explainableReasons || [];
+      }
 
       // 2. ML Models (Isolation Forest / Autoencoder simulation)
       const mlResult = await calculateMLFraudScore(extractedData);
 
       // 3. Combine Scores
-      const finalScore = Math.min(100, Math.max(0, (aiResult.aiFraudScore * 0.6) + (mlResult.score * 0.4)));
+      const finalScore = Math.min(100, Math.max(0, (aiFraudScore * 0.6) + (mlResult.score * 0.4)));
       
       let finalRiskLevel = "Low Risk";
       if (finalScore > 75) finalRiskLevel = "High Risk";
       else if (finalScore > 40) finalRiskLevel = "Medium Risk";
 
-      const allReasons = [...aiResult.explainableReasons, ...mlResult.reasons];
+      const allReasons = [...aiReasons, ...mlResult.reasons];
 
       // 4. Fraud Network Detection (NetworkX simulation)
       const hospitalId = extractedData.hospitalName || "Unknown Hospital";
