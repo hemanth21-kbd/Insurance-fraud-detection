@@ -102,13 +102,13 @@ export default function FraudRiskHeatmap() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Risk Level</label>
             <select
-              multiple
               className="w-full border border-slate-300 rounded-lg px-3 py-2"
+              value={filters.risk_level[0] || ''}
               onChange={(e) => {
-                const values = Array.from(e.target.selectedOptions, option => (option as HTMLOptionElement).value);
-                setFilters(prev => ({ ...prev, risk_level: values }));
+                setFilters(prev => ({ ...prev, risk_level: e.target.value ? [e.target.value] : [] }));
               }}
             >
+              <option value="">All Risks</option>
               <option value="Low Risk">Low Risk</option>
               <option value="Medium Risk">Medium Risk</option>
               <option value="High Risk">High Risk</option>
@@ -116,20 +116,13 @@ export default function FraudRiskHeatmap() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Claim Type</label>
-            <select
-              multiple
+            <label className="block text-sm font-medium text-slate-700 mb-2">Hospital Name</label>
+            <input
+              type="text"
               className="w-full border border-slate-300 rounded-lg px-3 py-2"
-              onChange={(e) => {
-                const values = Array.from(e.target.selectedOptions, option => (option as HTMLOptionElement).value);
-                setFilters(prev => ({ ...prev, claim_type: values }));
-              }}
-            >
-              <option value="Inpatient">Inpatient</option>
-              <option value="Outpatient">Outpatient</option>
-              <option value="Emergency">Emergency</option>
-              <option value="Surgery">Surgery</option>
-            </select>
+              placeholder="e.g. AIIMS"
+              onChange={(e) => setFilters(prev => ({ ...prev, hospital: e.target.value ? [e.target.value] : [] }))}
+            />
           </div>
 
           <div>
@@ -209,19 +202,23 @@ export default function FraudRiskHeatmap() {
                 <CircleMarker
                   key={hospital.hospital_name}
                   center={[hospital.coordinates.lat, hospital.coordinates.lng]}
-                  radius={10}
+                  radius={8 + (hospital.avg_fraud_probability * 20)}
                   pathOptions={{
                     color: hospital.risk_color,
                     fillColor: hospital.risk_color,
-                    fillOpacity: 0.5
+                    fillOpacity: 0.7
                   }}
                 >
                   <Popup>
-                    <div className="text-sm">
-                      <strong>{hospital.hospital_name}</strong>
-                      <div>Risk: {hospital.risk_level}</div>
-                      <div>Avg Fraud: {(hospital.avg_fraud_probability * 100).toFixed(1)}%</div>
-                      <div>Claims: {hospital.claim_count}</div>
+                    <div className="text-sm p-1">
+                      <div className="font-bold text-slate-900 mb-1">{hospital.hospital_name}</div>
+                      <div className="text-[10px] text-slate-500 mb-2">{hospital.address}</div>
+                      <div className="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-100">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">Fraud Index</span>
+                        <span className={`text-xs font-black ${hospital.avg_fraud_probability > 0.15 ? 'text-rose-600' : 'text-slate-900'}`}>
+                          {(hospital.avg_fraud_probability * 100).toFixed(1)}%
+                        </span>
+                      </div>
                     </div>
                   </Popup>
                 </CircleMarker>

@@ -120,7 +120,8 @@ function generateHeatmapData(filters: any = {}) {
     filtered = filtered.filter(h => filters.hospital.includes(h.hospital_name));
   }
   if (filters.risk_level && filters.risk_level.length > 0) {
-    filtered = filtered.filter(h => filters.risk_level.includes(h.risk_level));
+    const riskLevels = Array.isArray(filters.risk_level) ? filters.risk_level : [filters.risk_level];
+    filtered = filtered.filter(h => riskLevels.includes(h.risk_level));
   }
 
   return filtered;
@@ -473,15 +474,8 @@ function setupApiRoutes(app: express.Express) {
       const addAlert = () => {
         if (!monitoringActive) return;
         const hospitalList = HOSPITALS.map(h => h.name);
-        const indicators = [
-          "Claim amount significantly higher than average",
-          "Duplicate billing codes detected",
-          "Unusual admission pattern",
-          "Multiple claims same diagnosis",
-          "Geographic anomaly in claim location"
-        ];
         
-        const fraudScore = 60 + Math.random() * 35;
+        const fraudScore = 65 + Math.random() * 30;
         const newAlert = {
           alert_id: `ALT-${Date.now()}`,
           claim_id: `CLM-${Math.floor(Math.random() * 90000) + 10000}`,
@@ -489,7 +483,7 @@ function setupApiRoutes(app: express.Express) {
           fraud_score: parseFloat(fraudScore.toFixed(1)),
           risk_level: fraudScore >= 80 ? "Critical" : "High",
           timestamp: new Date().toISOString(),
-          suspicious_indicators: [indicators[Math.floor(Math.random() * indicators.length)]],
+          suspicious_indicators: ["Anomalous claim pattern detected", "Unusual hospital billing volume"],
           status: "active",
           escalation_level: fraudScore >= 80 ? "High" : "Medium",
           notes: ""
@@ -498,7 +492,7 @@ function setupApiRoutes(app: express.Express) {
         if (mockAlerts.length > 50) mockAlerts = mockAlerts.slice(0, 50);
         
         if (monitoringActive) {
-          setTimeout(addAlert, 15000 + Math.random() * 30000); // 15-45 seconds
+          setTimeout(addAlert, 10000); // Every 10 seconds for demo
         }
       };
       

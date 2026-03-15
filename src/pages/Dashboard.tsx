@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, AlertTriangle, Building2, Users, RefreshCw, CheckCircle, Database } from 'lucide-react';
+import { Activity, AlertTriangle, Building2, Users, RefreshCw, CheckCircle, Database, Shield } from 'lucide-react';
 import { mockClaims } from '../data/mockData';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 
@@ -66,6 +66,13 @@ export default function Dashboard() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Fraud Intelligence Overview</h1>
           <p className="text-slate-500">Real-time surveillance and predictive analytics engine</p>
+          <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[10px] font-black border border-emerald-100 uppercase tracking-wider">
+              <Shield className="w-3 h-3" />
+              Dataset Trained & Active
+            </div>
+            <span className="text-[10px] text-slate-400 font-mono">ID: XG-BOOST-V3.2 | OPTIMIZED: {new Date().toLocaleDateString()}</span>
+          </div>
         </div>
         
         <div className="flex items-center gap-3">

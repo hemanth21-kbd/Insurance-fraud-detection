@@ -37,11 +37,12 @@ export default function RealTimeFraudAlerts() {
     };
 
     fetchMonitoringStatus();
-
     fetchAlerts();
-    const interval = setInterval(fetchAlerts, 30000); // Refresh every 30 seconds
+    
+    // Faster refresh when active
+    const interval = setInterval(fetchAlerts, monitoringActive ? 5000 : 15000);
     return () => clearInterval(interval);
-  }, [threshold]);
+  }, [threshold, monitoringActive]);
 
   const fetchAlerts = async () => {
     try {
@@ -57,6 +58,11 @@ export default function RealTimeFraudAlerts() {
 
   const startMonitoring = async () => {
     try {
+      // Notification request
+      if ("Notification" in window && Notification.permission !== "granted") {
+        await Notification.requestPermission();
+      }
+
       const response = await fetch('/api/alerts/monitoring/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -64,7 +70,6 @@ export default function RealTimeFraudAlerts() {
       });
       const result = await response.json();
       setMonitoringActive(true);
-      console.log('Monitoring started:', result);
     } catch (error) {
       console.error('Failed to start monitoring:', error);
     }
