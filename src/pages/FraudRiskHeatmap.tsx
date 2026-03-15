@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { MapPin, AlertTriangle, TrendingUp, Filter, Download } from 'lucide-react';
+import { MapPin, AlertTriangle, TrendingUp, Filter, Download, Activity, Building2 } from 'lucide-react';
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -29,10 +29,10 @@ export default function FraudRiskHeatmap() {
   const [selectedHospital, setSelectedHospital] = useState<HeatmapData | null>(null);
 
   const mapCenter = useMemo(() => {
-    if (heatmapData.length === 0) return [40.73, -73.93];
+    if (heatmapData.length === 0) return [20.5937, 78.9629] as [number, number];
     const avgLat = heatmapData.reduce((sum, h) => sum + h.coordinates.lat, 0) / heatmapData.length;
     const avgLng = heatmapData.reduce((sum, h) => sum + h.coordinates.lng, 0) / heatmapData.length;
-    return [avgLat, avgLng];
+    return [avgLat, avgLng] as [number, number];
   }, [heatmapData]);
 
   useEffect(() => {
@@ -158,16 +158,46 @@ export default function FraudRiskHeatmap() {
         </div>
       </div>
 
+      {/* Risk Stats Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-slate-500">Avg Fraud Prob</span>
+            <Activity className="w-5 h-5 text-indigo-600" />
+          </div>
+          <div className="text-2xl font-bold text-slate-900">
+            {(heatmapData.reduce((sum, h) => sum + h.avg_fraud_probability, 0) / (heatmapData.length || 1) * 100).toFixed(1)}%
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-slate-500">Total Claims</span>
+            <AlertTriangle className="w-5 h-5 text-rose-600" />
+          </div>
+          <div className="text-2xl font-bold text-slate-900">
+            {heatmapData.reduce((sum, h) => sum + h.claim_count, 0).toLocaleString()}
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-slate-500">Flagged Amount</span>
+            <Building2 className="w-5 h-5 text-blue-600" />
+          </div>
+          <div className="text-2xl font-bold text-slate-900">
+            ${(heatmapData.reduce((sum, h) => sum + h.total_claim_amount, 0) / 1000000).toFixed(1)}M
+          </div>
+        </div>
+      </div>
+
       {/* Heatmap Visualization */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Map Placeholder */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Geographic Risk Map</h3>
-          <div className="h-96 rounded-lg overflow-hidden">
+        {/* Map */}
+        <div className="lg:col-span-2 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+          <h3 className="text-lg font-semibold text-slate-900 mb-4 px-2">Geographic Risk Distribution</h3>
+          <div className="h-[500px] rounded-lg overflow-hidden">
             <MapContainer
-              center={mapCenter}
-              zoom={11}
-              scrollWheelZoom={false}
+              center={[20.5937, 78.9629]}
+              zoom={5}
               className="h-full w-full"
             >
               <TileLayer

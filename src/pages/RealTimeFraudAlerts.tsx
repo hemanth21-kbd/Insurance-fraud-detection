@@ -17,7 +17,7 @@ export default function RealTimeFraudAlerts() {
   const [alerts, setAlerts] = useState<FraudAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [monitoringActive, setMonitoringActive] = useState(false);
-  const [threshold, setThreshold] = useState(0.75);
+  const [threshold, setThreshold] = useState(50);
   const [selectedAlert, setSelectedAlert] = useState<FraudAlert | null>(null);
   const [notificationSettings, setNotificationSettings] = useState({
     email: true,
@@ -45,7 +45,7 @@ export default function RealTimeFraudAlerts() {
 
   const fetchAlerts = async () => {
     try {
-      const response = await fetch(`/api/alerts?threshold=${threshold}&limit=50`);
+      const response = await fetch(`/api/alerts?threshold=${threshold}&limit=50&status=`);
       const data = await response.json();
       setAlerts(data.alerts || []);
     } catch (error) {
@@ -60,7 +60,7 @@ export default function RealTimeFraudAlerts() {
       const response = await fetch('/api/alerts/monitoring/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ threshold })
+        body: JSON.stringify({ threshold: threshold })
       });
       const result = await response.json();
       setMonitoringActive(true);
@@ -176,15 +176,15 @@ export default function RealTimeFraudAlerts() {
             <div className="flex items-center gap-2">
               <input
                 type="range"
-                min="0.5"
-                max="0.95"
-                step="0.05"
+                min="0"
+                max="95"
+                step="5"
                 value={threshold}
                 onChange={(e) => setThreshold(parseFloat(e.target.value))}
                 className="flex-1"
               />
               <span className="text-sm font-medium text-slate-900 w-12">
-                {(threshold * 100).toFixed(0)}%
+                {threshold}%
               </span>
             </div>
           </div>
@@ -275,7 +275,7 @@ export default function RealTimeFraudAlerts() {
                         {alert.claim_id} • {alert.hospital_name}
                       </div>
                       <div className="text-sm text-slate-500">
-                        {getTimeAgo(alert.timestamp)} • Fraud Score: {(alert.fraud_score).toFixed(1)}%
+                        {getTimeAgo(alert.timestamp)} • Fraud Score: {alert.fraud_score.toFixed(1)}%
                       </div>
                     </div>
                   </div>
